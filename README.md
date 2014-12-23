@@ -17,11 +17,11 @@ There are two components to the session tool.
 Configuration
 -------------
 
-The session tool stores its configuration in the user's `%HOME%` directory.
-The configuration file is a JSON-encoded file that can be managed manually
-(using a text editor), or through the configuration helper.  The configuration
-has several top-level sections to allow the user to customize its behavior and
-to manage each window session.
+The session tool stores its configuration in the user's `%UserProfile%`
+directory.  The configuration file is a JSON-encoded file that can be managed
+manually (using a text editor), or through the configuration helper.  The
+configuration has several top-level sections to allow the user to customize
+its behavior and to manage each window session.
 
 ### Configuration File Details
 
@@ -68,7 +68,7 @@ position with the specified dimensions.  Furthermore, it will pass the
 special `%UserProfile%` directory to the program to open it in the user's home
 directory.
 
-Of course, this is the simplest example, and doesn't really help as much a
+Of course, this is the simplest example, and doesn't really help as much as a
 regular Windows shortcut.  The difference here is the `filemanager`
 configuration item contains a list of windows that are launched.  Multiple
 windows with various dimensions and arguments can be given here.
