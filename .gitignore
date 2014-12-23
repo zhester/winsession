@@ -1,3 +1,6 @@
+# Build Output Directories
+build/mingw/build
+
 # Object files
 *.o
 *.ko
