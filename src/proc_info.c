@@ -96,7 +96,79 @@ error_type proc_get_command(        /* get the command used to start proc.  */
     proc_info_type*     info,       /* process information object           */
     proc_command_type*  command     /* user's command object memory         */
 ) {                                 /* returns error code                   */
+
+    /*------------------------------------------------------------------
+    Local Variables
+    ------------------------------------------------------------------*/
+    HANDLE              heap;       /* current process' heap handle         */
+    UNICODE_STRING      image_file; /* file name of the process' image      */
+    DWORD               return_length;
+                                    /* data length return variable          */
+    NTSTATUS            status;     /* status of NT Windows API calls       */
+    BOOL                wresult;    /* result of Windows API calls          */
+
+    /*------------------------------------------------------------------
+    Retrieve the necessary length of the image file name.
+    ------------------------------------------------------------------*/
+    return_length = 0;
+    status = info->instance->nqip(
+        info->handle,
+        ProcessImageFileName,
+        ( PVOID ) &image_file,
+        0,
+        &return_length
+    );
+    if( status != STATUS_INFO_LENGTH_MISMATCH ) {
+        return ERR_WINAPI;
+    }
+
+    /*------------------------------------------------------------------
+    Allocate the buffer to store the image file name.
+    ------------------------------------------------------------------*/
+    heap = GetProcessHeap();
+    image_file.Buffer = ( PWSTR ) HeapAlloc(
+        heap,
+        HEAP_ZERO_MEMORY,
+        return_length
+    );
+    if( image_file.Buffer == NULL ) {
+        return ERR_ALLOC;
+    }
+    image_file.Length        = return_length;
+    image_file.MaximumLength = return_length;
+
+    /*------------------------------------------------------------------
+    Retrieve the image file name.
+    ------------------------------------------------------------------*/
+    status = info->instance->nqip(
+        info->handle,
+        ProcessImageFileName,
+        ( PVOID ) &image_file,
+        image_file.Length,
+        &return_length
+    );
+    if( status != STATUS_SUCCESS ) {
+        HeapFree( heap, 0, image_file.Buffer );
+        return ERR_WINAPI;
+    }
+
+    /*------------------------------------------------------------------
+    Load the image file name into the user's memory.
+    ------------------------------------------------------------------*/
     //// ZIH - implement me
+
+    /*------------------------------------------------------------------
+    
+    ------------------------------------------------------------------*/
+
+    /*------------------------------------------------------------------
+    Release allocated memory.
+    ------------------------------------------------------------------*/
+    HeapFree( heap, 0, image_file.Buffer );
+
+    /*------------------------------------------------------------------
+    Return success.
+    ------------------------------------------------------------------*/
     return ERR_OK;
 }
 
@@ -138,7 +210,7 @@ error_type proc_get_user_sid(       /* get the process' user SID            */
             &return_length
         );
         if( ( wresult == FALSE )
-        && ( GetLastError() != ERROR_INSUFFICIENT_BUFFER ) ) {
+         && ( GetLastError() != ERROR_INSUFFICIENT_BUFFER ) ) {
             return ERR_WINAPI;
         }
 
@@ -176,6 +248,10 @@ error_type proc_get_user_sid(       /* get the process' user SID            */
     Load the process' SID into the user's memory.
     ------------------------------------------------------------------*/
     memcpy( sid, info->user->User.Sid, sizeof( SID ) );
+
+    /*------------------------------------------------------------------
+    Return success.
+    ------------------------------------------------------------------*/
     return ERR_OK;
 }
 
