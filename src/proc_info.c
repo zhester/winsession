@@ -42,6 +42,12 @@ void enable_process_debugging(      /* attempt to enable debugging features */
     void
 );
 
+error_type get_image(               /* get the process' image file name     */
+    proc_info_type*     info,       /* process information object           */
+    LPTSTR              image,      /* pointer to target string             */
+    proc_alloc_t32      alloc       /* memory allocation specification      */
+);                                  /* returns error code                   */
+
 /*----------------------------------------------------------------------------
 Implementation
 ----------------------------------------------------------------------------*/
@@ -94,82 +100,24 @@ void proc_close(                    /* close query interface to process     */
 /*==========================================================================*/
 error_type proc_get_command(        /* get the command used to start proc.  */
     proc_info_type*     info,       /* process information object           */
-    proc_command_type*  command     /* user's command object memory         */
+    proc_command_type*  command,    /* user's command object memory         */
+    proc_alloc_t32      alloc       /* memory allocation specification      */
 ) {                                 /* returns error code                   */
 
-    /*------------------------------------------------------------------
+    /*------------------------------------------------------
     Local Variables
-    ------------------------------------------------------------------*/
-    HANDLE              heap;       /* current process' heap handle         */
-    UNICODE_STRING      image_file; /* file name of the process' image      */
-    DWORD               return_length;
-                                    /* data length return variable          */
-    NTSTATUS            status;     /* status of NT Windows API calls       */
-    BOOL                wresult;    /* result of Windows API calls          */
+    ------------------------------------------------------*/
+    error_type          result;     /* result of internal operation         */
 
-    /*------------------------------------------------------------------
-    Retrieve the necessary length of the image file name.
-    ------------------------------------------------------------------*/
-    return_length = 0;
-    status = info->instance->nqip(
-        info->handle,
-        ProcessImageFileName,
-        ( PVOID ) &image_file,
-        0,
-        &return_length
-    );
-    if( status != STATUS_INFO_LENGTH_MISMATCH ) {
-        return ERR_WINAPI;
+    /*------------------------------------------------------
+    Get the process' image file name.
+    ------------------------------------------------------*/
+    result = get_image( info, command->image, alloc );
+    if( result != ERR_OK ) {
+        return result;
     }
 
-    /*------------------------------------------------------------------
-    Allocate the buffer to store the image file name.
-    ------------------------------------------------------------------*/
-    heap = GetProcessHeap();
-    image_file.Buffer = ( PWSTR ) HeapAlloc(
-        heap,
-        HEAP_ZERO_MEMORY,
-        return_length
-    );
-    if( image_file.Buffer == NULL ) {
-        return ERR_ALLOC;
-    }
-    image_file.Length        = return_length;
-    image_file.MaximumLength = return_length;
-
-    /*------------------------------------------------------------------
-    Retrieve the image file name.
-    ------------------------------------------------------------------*/
-    status = info->instance->nqip(
-        info->handle,
-        ProcessImageFileName,
-        ( PVOID ) &image_file,
-        image_file.Length,
-        &return_length
-    );
-    if( status != STATUS_SUCCESS ) {
-        HeapFree( heap, 0, image_file.Buffer );
-        return ERR_WINAPI;
-    }
-
-    /*------------------------------------------------------------------
-    Load the image file name into the user's memory.
-    ------------------------------------------------------------------*/
-    //// ZIH - implement me
-
-    /*------------------------------------------------------------------
-    
-    ------------------------------------------------------------------*/
-
-    /*------------------------------------------------------------------
-    Release allocated memory.
-    ------------------------------------------------------------------*/
-    HeapFree( heap, 0, image_file.Buffer );
-
-    /*------------------------------------------------------------------
-    Return success.
-    ------------------------------------------------------------------*/
-    return ERR_OK;
+    //ZIH - implement me
 }
 
 
@@ -453,5 +401,141 @@ void enable_process_debugging(      /* attempt to enable debugging features */
     Release the handle to the token.
     ------------------------------------------------------------------*/
     CloseHandle( token_handle );
+}
+
+
+/*==========================================================================*/
+error_type get_image(               /* get the process' image file name     */
+    proc_info_type*     info,       /* process information object           */
+    LPTSTR              image,      /* pointer to target string             */
+    proc_alloc_t32      alloc       /* memory allocation specification      */
+) {                                 /* returns error code                   */
+
+    /*------------------------------------------------------------------
+    Local Variables
+    ------------------------------------------------------------------*/
+    proc_alloc_t32      allocated;  /* memory allocated for user buffers    */
+    HANDLE              heap;       /* current process' heap handle         */
+    UNICODE_STRING      image_file; /* file name of the process' image      */
+    DWORD               return_length;
+                                    /* data length return variable          */
+    NTSTATUS            status;     /* status of NT Windows API calls       */
+    BOOL                wresult;    /* result of Windows API calls          */
+
+    /*------------------------------------------------------------------
+    Retrieve the necessary length of the image file name.
+    ------------------------------------------------------------------*/
+    return_length = 0;
+    status = info->instance->nqip(
+        info->handle,
+        ProcessImageFileName,
+        ( PVOID ) &image_file,
+        0,
+        &return_length
+    );
+    if( status != STATUS_INFO_LENGTH_MISMATCH ) {
+        return ERR_WINAPI;
+    }
+
+    /*------------------------------------------------------------------
+    Allocate the buffer to store the image file name.
+    ------------------------------------------------------------------*/
+    heap = GetProcessHeap();
+    image_file.Buffer = ( PWSTR ) HeapAlloc(
+        heap,
+        HEAP_ZERO_MEMORY,
+        return_length
+    );
+    if( image_file.Buffer == NULL ) {
+        return ERR_ALLOC;
+    }
+    image_file.Length        = return_length;
+    image_file.MaximumLength = return_length;
+
+    /*------------------------------------------------------------------
+    Retrieve the image file name.
+    ------------------------------------------------------------------*/
+    status = info->instance->nqip(
+        info->handle,
+        ProcessImageFileName,
+        ( PVOID ) &image_file,
+        image_file.Length,
+        &return_length
+    );
+    if( status != STATUS_SUCCESS ) {
+        HeapFree( heap, 0, image_file.Buffer );
+        return ERR_WINAPI;
+    }
+
+    /*------------------------------------------------------
+    Check for need to allocate string buffers.
+    ------------------------------------------------------*/
+    if( alloc == PROC_ALLOC_ALLOCATE ) {
+        command->image = ( LPTSTR ) HeapAlloc(
+            heap,
+            HEAP_ZERO_MEMORY,
+            return_length
+        );
+        if( command->image == NULL ) {
+            HeapFree( heap, 0, image_file.Buffer );
+            return ERR_ALLOC;
+        }
+        allocated = return_length;
+    }
+
+    /*------------------------------------------------------
+    Not allocating, check user's buffer sizes.
+    ------------------------------------------------------*/
+    else if( alloc < return_length ) {
+        HeapFree( heap, 0, image_file.Buffer );
+        return ERR_OVERFLOW;
+    }
+
+    /*------------------------------------------------------
+    User's buffers appear large enough.
+    ------------------------------------------------------*/
+    else {
+        allocated = alloc;
+    }
+
+    /*------------------------------------------------------------------
+    Load the image file name into the user's memory.
+    ------------------------------------------------------------------*/
+    #ifdef UNICODE
+        StringCbCopyN(
+            command->image,
+            allocated,
+            image_file.Buffer,
+            return_length
+        );
+    #else
+        WideCharToMultiByte(
+            CP_ACP,
+            0,
+            image_file.Buffer,
+            ( int ) ( return_length / sizeof( WCHAR ) ),
+            command->image,
+            allocated,
+            NULL,
+            NULL
+        );
+    #endif
+
+    /*------------------------------------------------------------------
+    Release allocated memory.
+    ------------------------------------------------------------------*/
+    HeapFree( heap, 0, image_file.Buffer );
+    image_file.Buffer = NULL;
+
+    //// ZIH - implement me
+
+    /*------------------------------------------------------------------
+    
+    ------------------------------------------------------------------*/
+
+    /*------------------------------------------------------------------
+    Return success.
+    ------------------------------------------------------------------*/
+    return ERR_OK;
 }
 

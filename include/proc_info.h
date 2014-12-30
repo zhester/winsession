@@ -62,6 +62,14 @@ typedef struct proc_info_s {        /* process information type             */
     proc_command_type*  command;    /* process start command                */
 } proc_info_type;
 
+typedef sint32 proc_alloc_t32;      /* process memory allocation spec       */
+                                    /* pass a 0 to request allocation, or   */
+                                    /* specify size (bytes) of buffer       */
+
+enum {                              /* memory allocation specifications     */
+    PROC_ALLOC_ALLOCATE = 0         /* library should allocate memory       */
+};
+
 /*----------------------------------------------------------------------------
 Memory Constants
 ----------------------------------------------------------------------------*/
@@ -76,7 +84,8 @@ void proc_close(                    /* close query interface to process     */
 
 error_type proc_get_command(        /* get the command used to start proc.  */
     proc_info_type*     info,       /* process information object           */
-    proc_command_type*  command     /* user's command object memory         */
+    proc_command_type*  command,    /* user's command object memory         */
+    proc_alloc_t32      alloc       /* memory allocation specification      */
 );                                  /* returns error code                   */
 
 error_type proc_get_user_sid(       /* get the process' user SID            */
